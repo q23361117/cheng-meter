@@ -1,50 +1,144 @@
-# Welcome to your Expo app 👋
+import React, { useState, useEffect } from "react";
+import { View, Text, Button, StyleSheet } from "react-native";
+import * as Location from "expo-location";
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+export default function MeterScreen() {
 
-## Get started
+  const baseFare = 70;
+  const perKm = 25;
+  const perMin = 5;
 
-1. Install dependencies
+  const [running, setRunning] = useState(false);
+  const [fare, setFare] = useState(baseFare);
+  const [distance, setDistance] = useState(0);
+  const [seconds, setSeconds] = useState(0);
 
-   ```bash
-   npm install
-   ```
+  const [lastLocation, setLastLocation] = useState<any>(null);
 
-2. Start the app
+  useEffect(() => {
 
-   ```bash
-   npx expo start
-   ```
+    let timer:any;
 
-In the output, you'll find options to open the app in a
+    if (running) {
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+      timer = setInterval(() => {
+        setSeconds((s)=>s+1)
+      },1000)
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+      getLocation()
 
-## Get a fresh project
+    }
 
-When you're ready, run:
+    return ()=> clearInterval(timer)
 
-```bash
-npm run reset-project
-```
+  },[running])
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
 
-## Learn more
+  async function getLocation(){
 
-To learn more about developing your project with Expo, look at the following resources:
+    let { status } = await Location.requestForegroundPermissionsAsync()
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+    if(status !== "granted") return
 
-## Join the community
+    Location.watchPositionAsync(
+      {
+        accuracy: Location.Accuracy.High,
+        distanceInterval: 10
+      },
+      (location)=>{
 
-Join our community of developers creating universal apps.
+        if(lastLocation){
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+          const dx = location.coords.latitude - lastLocation.coords.latitude
+          const dy = location.coords.longitude - lastLocation.coords.longitude
+
+          const d = Math.sqrt(dx*dx + dy*dy) * 111
+
+          setDistance(prev => prev + d)
+
+        }
+
+        setLastLocation(location.coords)
+
+      }
+    )
+
+  }
+
+
+  useEffect(()=>{
+
+    const kmFare = distance * perKm
+    const timeFare = (seconds/60) * perMin
+
+    setFare(Math.floor(baseFare + kmFare + timeFare))
+
+  },[distance,seconds])
+
+
+  return(
+
+    <View style={styles.container}>
+
+      <Text style={styles.title}>Driver Meter</Text>
+
+      <Text style={styles.data}>距離 {distance.toFixed(2)} km</Text>
+
+      <Text style={styles.data}>時間 {Math.floor(seconds/60)} 分</Text>
+
+      <Text style={styles.fare}>$ {fare}</Text>
+
+      <View style={styles.buttons}>
+
+        <Button
+          title={running ? "暫停" : "開始"}
+          onPress={()=>setRunning(!running)}
+        />
+
+        <Button
+          title="結束"
+          onPress={()=>{
+            setRunning(false)
+          }}
+        />
+
+      </View>
+
+    </View>
+
+  )
+
+}
+
+const styles = StyleSheet.create({
+
+container:{
+flex:1,
+justifyContent:"center",
+alignItems:"center"
+},
+
+title:{
+fontSize:32,
+fontWeight:"bold",
+marginBottom:20
+},
+
+data:{
+fontSize:22,
+marginBottom:10
+},
+
+fare:{
+fontSize:40,
+color:"green",
+marginTop:20
+},
+
+buttons:{
+flexDirection:"row",
+gap:20,
+marginTop:30
+}
+
+})
